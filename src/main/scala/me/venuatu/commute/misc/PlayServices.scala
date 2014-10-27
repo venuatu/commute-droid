@@ -1,4 +1,4 @@
-package me.venuatu.background_tracker
+package me.venuatu.commute.misc
 
 import android.support.v4.app.FragmentActivity
 import com.google.android.gms.common.{ConnectionResult, ErrorDialogFragment, GooglePlayServicesUtil}

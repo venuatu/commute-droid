@@ -1,4 +1,4 @@
-package me.venuatu.background_tracker
+package me.venuatu.commute.misc
 
 import java.io.{File, FileWriter}
 
@@ -9,7 +9,6 @@ import android.os.Bundle
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GooglePlayServicesClient.{ConnectionCallbacks, OnConnectionFailedListener}
 import com.google.android.gms.location._
-import spray.json._
 
 object LocationSaver {
   var lastLocation: Tracker.Location = null
@@ -90,7 +89,7 @@ class LocationSaver extends BroadcastReceiver with ConnectionCallbacks with OnCo
     val now = System.currentTimeMillis()
     val lastLoc = LocationSaver.lastLocation
     val location = Tracker.LocationUtils.fromAndroidLocation(loc)
-    if (loc.getAccuracy < 400 && (lastLoc == null || (loc.getTime - lastLoc.time > MIN_INTERVAL &&
+    if ((lastLoc == null || (loc.getTime - lastLoc.time > MIN_INTERVAL &&
         !Tracker.badLatLngNear(lastLoc.lat, location.lat, lastLoc.lng, location.lng, 30)))) {
       writeToFile(s"l,${location.time},${location.lat},${location.lng},${location.accuracy}")
       LocationSaver.lastLocation = location

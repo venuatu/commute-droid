@@ -1,20 +1,13 @@
-package me.venuatu.background_tracker
+package me.venuatu.commute.views
 
-import android.app.Fragment
 import android.os.Bundle
+import android.support.v4.app.Fragment
 import android.view._
 import macroid.{Contexts, IdGeneration}
 
-class BaseFragment(layout: Int = -1, menuLayout: Int = -1) extends Fragment with Contexts[Fragment] with IdGeneration {
+class BaseFragment(layout: Int = -1, menuLayout: Int = -1) extends Fragment with Contexts[Fragment]
+    with IdGeneration with ViewMixins {
   def ctx = getActivity.asInstanceOf[BaseActivity]
-
-  def onUiThread(block: => Unit) {
-    try {
-      ctx.onUiThread(block)
-    } catch {
-      case e: Exception => e.printStackTrace()
-    }
-  }
 
   override def onCreate(instanceState: Bundle) {
     super.onCreate(instanceState)

@@ -1,4 +1,4 @@
-package me.venuatu.background_tracker
+package me.venuatu.commute.misc
 
 import android.content.IntentSender
 import android.location.Location
@@ -6,9 +6,8 @@ import android.os.Bundle
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GooglePlayServicesClient.{ConnectionCallbacks, OnConnectionFailedListener}
 import com.google.android.gms.location.{LocationClient, LocationListener, LocationRequest}
-import com.google.android.gms.maps.model.LatLng
 import macroid.ActivityContext
-import me.venuatu.background_tracker.Tracker._
+import me.venuatu.commute.misc.Tracker._
 import spray.json.DefaultJsonProtocol._
 
 object Tracker {
