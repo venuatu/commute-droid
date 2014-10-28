@@ -1,5 +1,7 @@
 package me.venuatu.commute
 
+import java.io.File
+
 import android.animation.ValueAnimator
 import android.animation.ValueAnimator.AnimatorUpdateListener
 import android.graphics.{Color, PorterDuff, Bitmap}
@@ -11,19 +13,19 @@ import android.support.v7.widget.RecyclerView.ViewHolder
 import android.support.v7.widget.{CardView, RecyclerView, StaggeredGridLayoutManager}
 import android.util.DisplayMetrics
 import android.view.View.{OnClickListener, OnLongClickListener, OnTouchListener}
-import android.view.ViewGroup.LayoutParams
+import android.view.ViewGroup.LayoutParams._
 import android.view.{Gravity, MotionEvent, View, ViewGroup}
-import android.widget.{FrameLayout, LinearLayout, TextView}
+import android.widget._
 import com.google.android.gms.maps.model.LatLng
 import com.squareup.picasso.Picasso.LoadedFrom
 import com.squareup.picasso.{Target, Picasso}
 import macroid.FullDsl._
 import macroid.contrib.LpTweaks._
 import macroid.{Transformer, Tweak}
-import me.venuatu.commute.web.Flickr
+import me.venuatu.commute.web.{StreetView, Flickr}
 
 import scala.util.{Failure, Success}
-
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class LocationListFragment extends views.BaseFragment() {
 
@@ -39,7 +41,7 @@ class LocationListFragment extends views.BaseFragment() {
   override def onCreate(data: Bundle) {
     super.onCreate(data)
     val layout = l[FrameLayout](
-      w[RecyclerView] <~ wire(recycler) <~ lp[FrameLayout](LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+      w[RecyclerView] <~ wire(recycler) <~ lp[FrameLayout](MATCH_PARENT, MATCH_PARENT)
     )
     view = getUi(layout)
 
@@ -53,41 +55,36 @@ class LocationListFragment extends views.BaseFragment() {
 
   }
 
-  case class Holder(text: TextView, location: TextView, card: LinearLayout, view: View) extends ViewHolder(view)
+  case class Holder(text: TextView, image: ImageView, card: RelativeLayout, view: View) extends ViewHolder(view)
 
   class ListAdapter extends RecyclerView.Adapter[Holder] {
 
     override def onCreateViewHolder(group: ViewGroup, viewType: Int): Holder = {
-      var card = slot[LinearLayout]
+      var card = slot[RelativeLayout]
       var text = slot[TextView]
-      var location = slot[TextView]
+      var image = slot[ImageView]
       val view = getUi(
-        l[LinearLayout](
-          l[LinearLayout](
-            w[TextView] <~ wire(text) <~ wire(location) <~ textStyle(style.TextAppearance_AppCompat_Title)
-//            w[TextView] <~ wire(location) <~ hide
-          ) <~ vertical <~ matchWidth <~
-            lp[LinearLayout](LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        ) <~ padding(top = 16 dp, bottom = 16 dp) <~ wire(card)
+        l[RelativeLayout](
+          w[ImageView] <~ wire(image) <~ lp[RelativeLayout](MATCH_PARENT, 120.dp),
+          w[TextView] <~ wire(text) <~ textStyle(style.TextAppearance_AppCompat_Title)
+            <~ Tweak[TextView] {_.setTextSize(14.dp)} <~ padding(top = 40.dp, bottom = 40.dp)
+            <~ lp[RelativeLayout](MATCH_PARENT, MATCH_PARENT)
+        ) <~ wire(card) <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT)
           <~ Transformer {
-          case t: TextView => t <~ gravity(Gravity.CENTER) <~ padding(all = 16 dp) <~
-            lp[LinearLayout](LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+          case t: TextView => t <~ gravity(Gravity.CENTER)
         }
       )
 
-      val params = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+      val params = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
       if (columns > 1)
         params.setMargins(8 dp, 8 dp, 8 dp, 8 dp)
       else
         params.setMargins(8 dp, 4 dp, 8 dp, 4 dp)
-      val cardview = card.get
-      cardview.setLayoutParams(params)
-//      cardview.setForeground(attrDrawable(R.attr.selectableItemBackground))
-//      cardview.setMaxCardElevation(4)
-//      card.get.setBackground(new ColorDrawable(0xff282828))
-//      cardview.setCardElevation(1)
-//      cardview.setShadowPadding(16 dp, 16 dp, 16 dp, 16 dp)
-      Holder(text.get, location.get, card.get, view)
+      card.get.setLayoutParams(params)
+//      text.get.setBackground(attrDrawable(R.attr.selectableItemBackground))
+      image.get.setColorFilter(0xff888888, PorterDuff.Mode.MULTIPLY)
+      image.get.setScaleType(ImageView.ScaleType.CENTER_CROP)
+      Holder(text.get, image.get, card.get, view)
     }
 
     class ClickListener(h: Holder) extends OnClickListener with OnLongClickListener with OnTouchListener {
@@ -103,20 +100,22 @@ class LocationListFragment extends views.BaseFragment() {
 //            view.asInstanceOf[CardView].setCardElevation(8)
           }
           if (location == null)
-            location = (view.getY, h.location.getPaddingBottom)
-          val height = recycler.get.getHeight - h.card.getHeight - 8.dp + h.location.getPaddingBottom
-          val yPosition = - view.getTop + recycler.get.getScrollY + 4.dp
-          println(yPosition)
+            location = (view.getY, 120.dp)
+          val base = 120.dp
+          val height = recycler.get.getHeight - 16.dp - base
+          val yPosition = - view.getTop + recycler.get.getScrollY + 8.dp
+
           view.animate().translationY(yPosition).setUpdateListener(new AnimatorUpdateListener {
             override def onAnimationUpdate(anim: ValueAnimator): Unit = {
               val currheight = (anim.getAnimatedFraction * height).toInt
 //              println(s"${anim.getAnimatedFraction}, $currheight, $height")
-              h.location.setPadding(h.location.getPaddingLeft, h.location.getPaddingTop,
-                h.location.getPaddingRight, currheight)
+              val lp = new RelativeLayout.LayoutParams(MATCH_PARENT, currheight + base)
+              h.image.setLayoutParams(lp)
+              h.text.setLayoutParams(lp)
             }
           })
         } else if (p2.getAction == MotionEvent.ACTION_CANCEL || p2.getAction == MotionEvent.ACTION_UP) {
-          print("up")
+          println("up")
           reset(view)
         } else {
           println("MotionEvent", p2.getAction)
@@ -128,7 +127,7 @@ class LocationListFragment extends views.BaseFragment() {
       override def onLongClick(view: View): Boolean = false //{ reset(view, 800); true }
 
       def reset(view: View, delay: Int = 15) {
-        print("click up")
+        println("click up")
         view.postDelayed(asRunnable {
           if (isLollipop) {
             view.animate().translationZ(0)
@@ -136,14 +135,15 @@ class LocationListFragment extends views.BaseFragment() {
 //            view.asInstanceOf[CardView].setCardElevation(4)
           }
           if (location != null) {
-            val base: Int = if (location != null) location._2.toInt else 24.dp
-            val height: Float = h.location.getPaddingBottom - base
+            val base = 120.dp
+            val height: Float = h.image.getHeight - base
             view.animate().translationY(0).setUpdateListener(new AnimatorUpdateListener {
               override def onAnimationUpdate(anim: ValueAnimator): Unit = {
                 val currheight = ((1 - anim.getAnimatedFraction) * height).toInt
 //                println(s"${anim.getAnimatedFraction}, $currheight, $base, $height")
-                h.location.setPadding(h.location.getPaddingLeft, h.location.getPaddingTop,
-                  h.location.getPaddingRight, currheight + base)
+                val lp = new RelativeLayout.LayoutParams(MATCH_PARENT, currheight + base)
+                h.image.setLayoutParams(lp)
+                h.text.setLayoutParams(lp)
               }
             })
           }
@@ -151,11 +151,7 @@ class LocationListFragment extends views.BaseFragment() {
       }
     }
 
-    lazy val picasso = {
-      val pic = Picasso.`with`(ctx)
-      pic.setIndicatorsEnabled(true)
-      pic
-    }
+    lazy implicit val picasso = Picasso.`with`(ctx)
 
     lazy val dimensions = s"${recycler.get.getHeight}x${recycler.get.getWidth}"
 
@@ -169,42 +165,14 @@ class LocationListFragment extends views.BaseFragment() {
       h.card.setOnClickListener(clicker)
       h.card.setOnLongClickListener(clicker)
       h.card.setOnTouchListener(clicker)
-      h.card.setBackgroundColor(0xff282828)
-
-      val url = s"https://maps.googleapis.com/maps/api/streetview?fov=60&size=$dimensions&location=${item._2.latitude},${item._2.longitude}"
-      println(item._1, url)
-      picasso.load(url).into(new Target {
-        override def onBitmapFailed(errorDrawable: Drawable): Unit = {
-          println("bitmap failed ", item._1)
-          h.card.setBackground(errorDrawable)
-          h.card.setBackgroundColor(0xff87ceeb)
-        }
-
-        override def onPrepareLoad(placeHolderDrawable: Drawable): Unit = {
-//          h.card.setBackground(placeHolderDrawable)
-//          h.card.setBackgroundColor(0xff404040)
-        }
-
-        override def onBitmapLoaded(bitmap: Bitmap, from: LoadedFrom): Unit = {
-          val rs = RenderScript.create(ctx)
-          val start = System.currentTimeMillis()
-          val input = Allocation.createFromBitmap(rs, bitmap)
-          val output = Allocation.createTyped(rs, input.getType)
-          val blur = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs))
-
-          blur.setRadius(4f)
-          blur.setInput(input)
-          blur.forEach(output)
-
-          output.copyTo(bitmap)
-          val drawable = new BitmapDrawable(bitmap)
-          drawable.setGravity(Gravity.CENTER | Gravity.FILL_VERTICAL| Gravity.FILL_HORIZONTAL
-              | Gravity.CLIP_HORIZONTAL | Gravity.CLIP_VERTICAL)
-          drawable.setColorFilter(0xff777777, PorterDuff.Mode.MULTIPLY)
-          h.card.setBackground(drawable)
-          println(s"${item._1} rendered in ${System.currentTimeMillis() - start}")
-        }
-      })
+      val start = System.currentTimeMillis()
+      streetView.getBlurredImage(item._2) onCompleteUi {
+        case Success(file: File) =>
+          picasso.load(file).into(h.image)
+          println("load file took: ", System.currentTimeMillis() - start)
+        case Failure(e) =>
+          e.printStackTrace()
+      }
     }
 
     override def getItemCount: Int = {
@@ -212,5 +180,5 @@ class LocationListFragment extends views.BaseFragment() {
     }
   }
 
-
+  lazy val streetView = new StreetView
 }
