@@ -4,6 +4,7 @@ import java.io.File
 
 import android.animation.ValueAnimator
 import android.animation.ValueAnimator.AnimatorUpdateListener
+import android.app.Activity
 import android.graphics.{Color, PorterDuff, Bitmap}
 import android.graphics.drawable.{BitmapDrawable, Drawable}
 import android.os.{Build, Bundle}
@@ -14,6 +15,7 @@ import android.support.v7.widget.{CardView, RecyclerView, StaggeredGridLayoutMan
 import android.util.DisplayMetrics
 import android.view.View.{OnClickListener, OnLongClickListener, OnTouchListener}
 import android.view.ViewGroup.LayoutParams._
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.{Gravity, MotionEvent, View, ViewGroup}
 import android.widget._
 import com.google.android.gms.maps.model.LatLng
@@ -22,7 +24,10 @@ import com.squareup.picasso.{Target, Picasso}
 import macroid.FullDsl._
 import macroid.contrib.LpTweaks._
 import macroid.{Transformer, Tweak}
+import me.venuatu.commute.views.Transition
 import me.venuatu.commute.web.{StreetView, Flickr}
+import scala.concurrent.Promise
+import scala.concurrent.duration.DurationInt
 
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -30,9 +35,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class LocationListFragment extends views.BaseFragment() {
 
   val DATA = Seq[(String, LatLng)](
-    "Home" ->     new LatLng(-34.410804, 150.880898),
-    "Work" ->     new LatLng(-34.408460, 150.882353),
-    "Deloitte" -> new LatLng(-33.862794, 151.207398)
+    "Home" ->                           new LatLng(-34.410804, 150.880898),
+    "Work" ->                           new LatLng(-34.408460, 150.882353),
+    "Coles Fairy Meadow" ->             new LatLng(-34.394601, 150.893009),
+    "Deloitte" ->                       new LatLng(-33.862794, 151.207398),
+    "Transport for New South Wales" ->  new LatLng(-33.884096, 151.203697)
   )
 
   var recycler = slot[RecyclerView]
@@ -52,12 +59,19 @@ class LocationListFragment extends views.BaseFragment() {
 
     recycler.get.setLayoutManager(manager)
     recycler.get.setAdapter(new ListAdapter)
+  }
 
+  override def onAttach(activity: Activity) {
+    super.onAttach(activity)
+    ctx.setTitle("Commute")
   }
 
   case class Holder(text: TextView, image: ImageView, card: RelativeLayout, view: View) extends ViewHolder(view)
 
   class ListAdapter extends RecyclerView.Adapter[Holder] {
+    val BASE_HEIGHT = 120.dp
+    val interpolator = new AccelerateDecelerateInterpolator()
+    val animate = Transition(interpolator)
 
     override def onCreateViewHolder(group: ViewGroup, viewType: Int): Holder = {
       var card = slot[RelativeLayout]
@@ -65,31 +79,34 @@ class LocationListFragment extends views.BaseFragment() {
       var image = slot[ImageView]
       val view = getUi(
         l[RelativeLayout](
-          w[ImageView] <~ wire(image) <~ lp[RelativeLayout](MATCH_PARENT, 120.dp),
+          w[ImageView] <~ wire(image) <~ lp[RelativeLayout](MATCH_PARENT, BASE_HEIGHT),
           w[TextView] <~ wire(text) <~ textStyle(style.TextAppearance_AppCompat_Title)
-            <~ Tweak[TextView] {_.setTextSize(14.dp)} <~ padding(top = 40.dp, bottom = 40.dp)
-            <~ lp[RelativeLayout](MATCH_PARENT, MATCH_PARENT)
+            <~ Tweak[TextView] {_.setTextSize(24)} <~ padding(top = 40.dp, bottom = 40.dp)
+            <~ lp[RelativeLayout](MATCH_PARENT, BASE_HEIGHT)
         ) <~ wire(card) <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT)
           <~ Transformer {
           case t: TextView => t <~ gravity(Gravity.CENTER)
         }
       )
-
+      println(s"1 dp is ${1.dp}")
       val params = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
       if (columns > 1)
-        params.setMargins(8 dp, 8 dp, 8 dp, 8 dp)
+        params.setMargins(1, 1, 1, 1)
       else
-        params.setMargins(8 dp, 4 dp, 8 dp, 4 dp)
+        params.setMargins(0, 1, 0, 1)
       card.get.setLayoutParams(params)
 //      text.get.setBackground(attrDrawable(R.attr.selectableItemBackground))
-      image.get.setColorFilter(0xff888888, PorterDuff.Mode.MULTIPLY)
+      image.get.setColorFilter(0xffaaaaaa, PorterDuff.Mode.MULTIPLY)
       image.get.setScaleType(ImageView.ScaleType.CENTER_CROP)
       Holder(text.get, image.get, card.get, view)
     }
 
     class ClickListener(h: Holder) extends OnClickListener with OnLongClickListener with OnTouchListener {
       val CLICKED_Z = 15
-      var location: (Float, Float) = null
+      var animation: Promise[Unit] = null
+
+      def translationX(value: Float) = Tweak[View] {_.setTranslationX(value)}
+      def translationY(value: Float) = Tweak[View] {_.setTranslationY(value)}
 
       override def onTouch(view: View, p2: MotionEvent): Boolean = {
         if (p2.getAction == MotionEvent.ACTION_DOWN) {
@@ -99,23 +116,21 @@ class LocationListFragment extends views.BaseFragment() {
           } else {
 //            view.asInstanceOf[CardView].setCardElevation(8)
           }
-          if (location == null)
-            location = (view.getY, 120.dp)
-          val base = 120.dp
-          val height = recycler.get.getHeight - 16.dp - base
-          val yPosition = - view.getTop + recycler.get.getScrollY + 8.dp
+          val height = recycler.get.getHeight
+          val yPosition = - view.getTop + recycler.get.getScrollY
+          val yRange = Transition.MultipliableRange(0 until yPosition)
+          val heightRange = Transition.MultipliableRange(BASE_HEIGHT until height)
 
-          view.animate().translationY(yPosition).setUpdateListener(new AnimatorUpdateListener {
-            override def onAnimationUpdate(anim: ValueAnimator): Unit = {
-              val currheight = (anim.getAnimatedFraction * height).toInt
-//              println(s"${anim.getAnimatedFraction}, $currheight, $height")
-              val lp = new RelativeLayout.LayoutParams(MATCH_PARENT, currheight + base)
-              h.image.setLayoutParams(lp)
-              h.text.setLayoutParams(lp)
-            }
-          })
-        } else if (p2.getAction == MotionEvent.ACTION_CANCEL || p2.getAction == MotionEvent.ACTION_UP) {
-          println("up")
+          if (animation != null && !animation.isCompleted) {
+            animation.success()
+          }
+          animation = animate(250.millis,
+            v => view    <~ translationY(yRange * v),
+            v => h.image <~ lp[RelativeLayout](MATCH_PARENT, heightRange *| v),
+            v => h.text  <~ lp[RelativeLayout](MATCH_PARENT, heightRange *| v)
+          )
+        } else if (p2.getAction == MotionEvent.ACTION_CANCEL){// || p2.getAction == MotionEvent.ACTION_UP) {
+          println("cancel")
           reset(view)
         } else {
           println("MotionEvent", p2.getAction)
@@ -123,31 +138,29 @@ class LocationListFragment extends views.BaseFragment() {
         false
       }
 
-      override def onClick(view: View) = reset(view)
+      override def onClick(view: View) = {
+        println("click")
+        reset(view)
+      }
       override def onLongClick(view: View): Boolean = false //{ reset(view, 800); true }
 
-      def reset(view: View, delay: Int = 15) {
-        println("click up")
-        view.postDelayed(asRunnable {
-          if (isLollipop) {
-            view.animate().translationZ(0)
-          } else {
-//            view.asInstanceOf[CardView].setCardElevation(4)
-          }
-          if (location != null) {
-            val base = 120.dp
-            val height: Float = h.image.getHeight - base
-            view.animate().translationY(0).setUpdateListener(new AnimatorUpdateListener {
-              override def onAnimationUpdate(anim: ValueAnimator): Unit = {
-                val currheight = ((1 - anim.getAnimatedFraction) * height).toInt
-//                println(s"${anim.getAnimatedFraction}, $currheight, $base, $height")
-                val lp = new RelativeLayout.LayoutParams(MATCH_PARENT, currheight + base)
-                h.image.setLayoutParams(lp)
-                h.text.setLayoutParams(lp)
-              }
-            })
-          }
-        }, 16 * delay)
+      def reset(view: View, delay: Int = 8) {
+        if (isLollipop) {
+          view.animate().translationZ(0)
+        } else {
+//          view.asInstanceOf[CardView].setCardElevation(4)
+        }
+        val yRange = Transition.MultipliableRange(h.card.getTranslationY.toInt until 0)
+        val heightRange = Transition.MultipliableRange(h.image.getHeight until BASE_HEIGHT)
+
+        if (animation != null && !animation.isCompleted) {
+          animation.success()
+        }
+        animation = animate(250.millis,
+          v => view    <~ translationY(yRange * v),
+          v => h.image <~ lp[RelativeLayout](MATCH_PARENT, heightRange *| v),
+          v => h.text  <~ lp[RelativeLayout](MATCH_PARENT, heightRange *| v)
+        )
       }
     }
 
