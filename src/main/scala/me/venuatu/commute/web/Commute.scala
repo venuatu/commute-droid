@@ -49,7 +49,7 @@ object Commute {
     val request = new Request.Builder()
       .url(Uri.parse(URL + "route").buildUpon()
         .appendQueryParameter("from", serializeLocation(from))
-        .appendQueryParameter("to", serializeLocation(from))
+        .appendQueryParameter("to", serializeLocation(to))
 //        .appendQueryParameter("time", )
         .appendQueryParameter("departing", if (departing) "true" else "false")
         .build().toString
