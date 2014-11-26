@@ -24,6 +24,8 @@ object Transition {
     def *|(value: Float) =
       (range * value).toInt
   }
+
+  object CancelAnimation extends Exception {}
 }
 
 class Transition(interpolator: TimeInterpolator) {

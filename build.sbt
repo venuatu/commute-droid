@@ -55,10 +55,10 @@ proguardOptions in Android ++= Seq(
 proguardCache in Android ++= Seq(
   ProguardCache("spray") % "io.spray" %% "spray-json_2.11.0-RC4",
   ProguardCache("macroid") % "org.macroid" %% "macroid",
-  ProguardCache("com.google.android.gms") % "com.google.android.gms" % "play-services"
+  ProguardCache("com.google.android.gms") % "com.google.android.gms" % "play-services",
 //  ProguardCache("android.support") % "com.android.support" % "gridlayout-v7",
-//  ProguardCache("android.support") % "com.android.support" % "support-v4",
+  ProguardCache("android.support") % "com.android.support" % "support-v4",
 //  ProguardCache("android.support") % "com.android.support" % "appcompat-v7",
 //  ProguardCache("android.support") % "com.android.support" % "cardview-v7",
-//  ProguardCache("android.support") % "com.android.support" % "recyclerview-v7"
+  ProguardCache("android.support") % "com.android.support" % "recyclerview-v7"
 )

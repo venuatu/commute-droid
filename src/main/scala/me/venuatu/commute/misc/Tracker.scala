@@ -59,6 +59,7 @@ class Tracker(priority: Priority, f: (LocationEvent) => Unit)(implicit ctx: Acti
   req.setFastestInterval(priority.minInterval)
 
   val client = new LocationClient(ctx.get, this, this)
+  start()
 
   def start() {
     client.connect()

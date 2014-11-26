@@ -16,7 +16,7 @@ import android.util.DisplayMetrics
 import android.view.View.{OnClickListener, OnLongClickListener, OnTouchListener}
 import android.view.ViewGroup.LayoutParams._
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.{Gravity, MotionEvent, View, ViewGroup}
+import android.view._
 import android.widget._
 import com.google.android.gms.maps.model.LatLng
 import com.squareup.picasso.Picasso.LoadedFrom
@@ -45,12 +45,12 @@ class LocationListFragment extends views.BaseFragment() {
   var recycler = slot[RecyclerView]
   var columns: Int = 1
 
-  override def onCreate(data: Bundle) {
-    super.onCreate(data)
+  override def onCreateView(inflater: LayoutInflater, container: ViewGroup, bundle: Bundle) = {
+    super.onCreateView(inflater, container, bundle)
     val layout = l[FrameLayout](
       w[RecyclerView] <~ wire(recycler) <~ lp[FrameLayout](MATCH_PARENT, MATCH_PARENT)
     )
-    view = getUi(layout)
+    val view = getUi(layout)
 
     val metrics = new DisplayMetrics()
     ctx.getWindowManager.getDefaultDisplay.getMetrics(metrics)
@@ -59,6 +59,8 @@ class LocationListFragment extends views.BaseFragment() {
 
     recycler.get.setLayoutManager(manager)
     recycler.get.setAdapter(new ListAdapter)
+
+    view
   }
 
   override def onAttach(activity: Activity) {
@@ -66,7 +68,12 @@ class LocationListFragment extends views.BaseFragment() {
     ctx.setTitle("Commute")
   }
 
-  case class Holder(text: TextView, image: ImageView, card: RelativeLayout, view: View) extends ViewHolder(view)
+  override def onResume() {
+    super.onResume()
+    ctx.setTitle("Commute")
+  }
+
+  case class Holder(text: TextView, image: ImageView, card: RelativeLayout, view: View, var pos: Int) extends ViewHolder(view)
 
   class ListAdapter extends RecyclerView.Adapter[Holder] {
     val BASE_HEIGHT = 120.dp
@@ -88,7 +95,7 @@ class LocationListFragment extends views.BaseFragment() {
           case t: TextView => t <~ gravity(Gravity.CENTER)
         }
       )
-      println(s"1 dp is ${1.dp}")
+
       val params = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
       if (columns > 1)
         params.setMargins(1, 1, 1, 1)
@@ -98,7 +105,7 @@ class LocationListFragment extends views.BaseFragment() {
 //      text.get.setBackground(attrDrawable(R.attr.selectableItemBackground))
       image.get.setColorFilter(0xffaaaaaa, PorterDuff.Mode.MULTIPLY)
       image.get.setScaleType(ImageView.ScaleType.CENTER_CROP)
-      Holder(text.get, image.get, card.get, view)
+      Holder(text.get, image.get, card.get, view, 0)
     }
 
     class ClickListener(h: Holder) extends OnClickListener with OnLongClickListener with OnTouchListener {
@@ -118,17 +125,24 @@ class LocationListFragment extends views.BaseFragment() {
           }
           val height = recycler.get.getHeight
           val yPosition = - view.getTop + recycler.get.getScrollY
-          val yRange = Transition.MultipliableRange(0 until yPosition)
-          val heightRange = Transition.MultipliableRange(BASE_HEIGHT until height)
+          val yRange = Transition.MultipliableRange(h.card.getTranslationY.toInt until yPosition)
+          val heightRange = Transition.MultipliableRange(h.image.getHeight until height)
 
           if (animation != null && !animation.isCompleted) {
-            animation.success()
+            animation.failure(Transition.CancelAnimation)
           }
           animation = animate(250.millis,
             v => view    <~ translationY(yRange * v),
             v => h.image <~ lp[RelativeLayout](MATCH_PARENT, heightRange *| v),
             v => h.text  <~ lp[RelativeLayout](MATCH_PARENT, heightRange *| v)
           )
+          animation.future onSuccessUi {
+            case _ =>
+            getFragmentManager.beginTransaction()
+              .replace(Id.content_view, TravelFragment.towards(DATA(h.pos)))
+              .addToBackStack(null)
+              .commit()
+          }
         } else if (p2.getAction == MotionEvent.ACTION_CANCEL){// || p2.getAction == MotionEvent.ACTION_UP) {
           println("cancel")
           reset(view)
@@ -154,7 +168,7 @@ class LocationListFragment extends views.BaseFragment() {
         val heightRange = Transition.MultipliableRange(h.image.getHeight until BASE_HEIGHT)
 
         if (animation != null && !animation.isCompleted) {
-          animation.success()
+          animation.failure(Transition.CancelAnimation)
         }
         animation = animate(250.millis,
           v => view    <~ translationY(yRange * v),
@@ -170,6 +184,7 @@ class LocationListFragment extends views.BaseFragment() {
 
     override def onBindViewHolder(h: Holder, position: Int) {
       val item = DATA(position)
+      h.pos = position
 
       h.text.setText(item._1)
 //      h.location.setText(s"${item._2.latitude} ${item._2.longitude}")

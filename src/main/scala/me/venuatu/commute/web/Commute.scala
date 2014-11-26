@@ -1,6 +1,7 @@
 package me.venuatu.commute.web
 
 import android.net.Uri
+import android.util.Log
 import com.google.android.gms.maps.model.LatLng
 import com.squareup.okhttp.Request
 import macroid.AppContext
@@ -17,7 +18,7 @@ object Commute {
                           lat: Float, lng: Float)
   case class TripStep(streetName: Option[String], bogusName: Boolean, relativeDirection: Option[String],
                       absoluteDirection: Option[String], distance: Float, lat: Float, lng: Float, path: Option[String])
-  case class TripLegAlert(text: String, upstream: String, start: String, end: String)
+  case class TripLegAlert(text: String, upstream: String, start: Option[String], end: Option[String])
   case class TripRoadSegments(id: String, path: String, lastStep: Int, distance: Float, quickDuration: Float,
                               minDuration: Float, maxDuration: Float, congestion: Int)
   case class TripLeg(from: StopLocation, to: StopLocation, transport: String, startTime: Long, endTime: Long,
@@ -55,11 +56,13 @@ object Commute {
         .build().toString
       )
       .build()
-
+    Log.d("commuteurl", request.toString)
     WebRequest.doRequest(request) map {resp =>
       if ((resp.code() / 100) != 2)
         throw new Exception(s"commute api gave a ${resp.code()} ${resp.body().string()}")
-      resp.body().string().parseJson.convertTo[TripResult].trips
+      val str = resp.body().string()
+      Log.d("commuteresp", str)
+      str.parseJson.convertTo[TripResult].trips
     }
   }
 }
