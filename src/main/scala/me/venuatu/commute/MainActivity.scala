@@ -51,7 +51,7 @@ class MainActivity extends views.BaseActivity {
         case event =>
           Log.d("commute.tracker", event.toString)
       })
-    if (location != null && location.time + 1 * 60 > System.currentTimeMillis()) {
+    if (location != null && location.time + 1 * 60 * 1000 > System.currentTimeMillis()) {
       pushLocation()
       tracker.stop()
     } else {

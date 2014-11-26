@@ -62,7 +62,9 @@ class Tracker(priority: Priority, f: (LocationEvent) => Unit)(implicit ctx: Acti
   start()
 
   def start() {
-    client.connect()
+    if (!connected) {
+      client.connect()
+    }
   }
 
   def stop() {

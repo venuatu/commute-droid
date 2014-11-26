@@ -1,5 +1,7 @@
 package me.venuatu.commute
 
+import java.util.Calendar
+
 import android.graphics.PorterDuff
 import android.os.Bundle
 import android.support.v7.appcompat.R.style
@@ -12,7 +14,7 @@ import android.widget.{RelativeLayout, ImageView, TextView, LinearLayout}
 import com.google.android.gms.maps.model.LatLng
 import macroid.{Transformer, Tweak}
 import me.venuatu.commute.misc.Tracker
-import me.venuatu.commute.views.BaseFragment
+import me.venuatu.commute.views.{TripStopView, BaseFragment}
 import me.venuatu.commute.web.Commute
 import me.venuatu.commute.web.Commute.Trip
 import macroid.FullDsl._
@@ -64,31 +66,51 @@ class TripFragment extends BaseFragment() {
     bundle.putSerializable("trip", trip)
   }
 
-  case class Holder(text: TextView, view: View) extends ViewHolder(view)
+  case class Holder(text: TextView, trip: TripStopView, view: View) extends ViewHolder(view)
 
   class ListAdapter extends RecyclerView.Adapter[Holder] {
+    lazy val offset = {
+      Calendar.getInstance().getTimeZone.getOffset(0)
+    }
 
     override def onCreateViewHolder(group: ViewGroup, viewType: Int): Holder = {
       var text = slot[TextView]
+      var tripview = slot[TripStopView]
       val view = getUi(
         l[LinearLayout](
+          w[TripStopView] <~ wire(tripview) <~ lp[LinearLayout](64.dp, MATCH_PARENT),
           w[TextView] <~ wire(text) <~ textStyle(style.TextAppearance_AppCompat_Body1)
+            <~ padding(bottom = 8.dp)
             <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT)
-        ) <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT)
+        ) <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT) <~ horizontal
       )
 
       //      text.get.setBackground(attrDrawable(R.attr.selectableItemBackground))
-      Holder(text.get, view)
+      Holder(text.get, tripview.get, view)
     }
 
     override def onBindViewHolder(p1: Holder, p2: Int) {
-      p1.text.setText(
-        trip.legs(p2).toJson.prettyPrint
-      )
+      if (p2 < trip.legs.length) {
+        val leg = trip.legs(p2)
+        p1.text.setText(Seq(
+          leg.transport + " " + leg.routeId.toJson.prettyPrint.replace("null", "") + " " +
+              (System.currentTimeMillis() - offset - leg.startTime),
+          leg.from.name + " " + offset,
+          leg.distance + "m " + leg.duration + "s"
+        ).mkString("\n"))
+        p1.trip.setLeg(leg)
+      } else {
+        val leg = trip.legs(p2 -1)
+        p1.text.setText(Seq(
+          leg.to.name,
+          (System.currentTimeMillis() - offset - leg.endTime) + "s"
+        ).mkString("\n"))
+        p1.trip.setLeg(null)
+      }
     }
 
     override def getItemCount: Int = {
-      trip.legs.length
+      trip.legs.length +1
     }
   }
 }
