@@ -60,7 +60,6 @@ class TravelFragment extends views.BaseFragment() {
   var tabStrip = slot[PagerTabStrip]
   lazy val pagerAdapter = new Pager(getChildFragmentManager)
   val trips = collection.mutable.ArrayBuffer[Trip]()
-  var tracker: Tracker = null
 
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, bundle: Bundle) = {
     super.onCreateView(inflater, container, bundle)
@@ -84,13 +83,7 @@ class TravelFragment extends views.BaseFragment() {
       case Failure(e) => e.printStackTrace()
     }
 
-    tracker = new Tracker(Tracker.Priority("high", 1, 1), {
-      case loc: Tracker.Location =>
-        updateLocation(loc)
-        Log.d("travel.tracker", loc.toString)
-      case e =>
-        Log.d("travel.tracker", e.toString)
-    })
+    ctx.asInstanceOf[MainActivity].requestLocationUpdate()
 
     pager.get.setAdapter(pagerAdapter)
     tabStrip = Some(new PagerTabStrip(ctx))
@@ -109,26 +102,17 @@ class TravelFragment extends views.BaseFragment() {
     ctx.setTitle(name)
   }
 
-  override def onStop() {
-    super.onStop()
-    tracker.stop()
-  }
-
   def updateLocation(loc: Tracker.Location) = {
-    Toast.makeText(ctx, loc.toJson.toString(), Toast.LENGTH_SHORT).show()
-    if (loc.accuracy < 50/*m*/) {
-      tracker.stop()
-      ctx.setProgressBarIndeterminateVisibility(true)
-      Commute.pullTrip(new LatLng(loc.lat, loc.lng), destination, departing = true) onCompleteUi {
-        case Success(pulled) =>
-          pulled.foreach {trip => trips += trip}
-          ctx.setProgressBarIndeterminateVisibility(false)
-          pagerAdapter.notifyDataSetChanged()
-        case Failure(e) =>
-          e.printStackTrace()
-          Toast.makeText(ctx, e.toString, Toast.LENGTH_LONG).show()
-          ctx.onBackPressed()
-      }
+    ctx.setProgressBarIndeterminateVisibility(true)
+    Commute.pullTrip(new LatLng(loc.lat, loc.lng), destination, departing = true) onCompleteUi {
+      case Success(pulled) =>
+        pulled.foreach {trip => trips += trip}
+        ctx.setProgressBarIndeterminateVisibility(false)
+        pagerAdapter.notifyDataSetChanged()
+      case Failure(e) =>
+        e.printStackTrace()
+        Toast.makeText(ctx, e.toString, Toast.LENGTH_LONG).show()
+        ctx.onBackPressed()
     }
   }
 
