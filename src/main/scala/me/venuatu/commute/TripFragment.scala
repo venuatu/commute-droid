@@ -3,18 +3,20 @@ package me.venuatu.commute
 import java.util.Calendar
 
 import android.graphics.PorterDuff
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.support.v7.appcompat.R.style
 import android.support.v7.widget.{LinearLayoutManager, RecyclerView}
 import android.support.v7.widget.RecyclerView.ViewHolder
-import android.util.Log
+import android.text.format.DateUtils
+import android.util.{TypedValue, Log}
 import android.view.ViewGroup.LayoutParams._
 import android.view.{LayoutInflater, Gravity, ViewGroup, View}
-import android.widget.{RelativeLayout, ImageView, TextView, LinearLayout}
+import android.widget._
 import com.google.android.gms.maps.model.LatLng
 import macroid.{Transformer, Tweak}
 import me.venuatu.commute.misc.Tracker
-import me.venuatu.commute.views.{TripStopView, BaseFragment}
+import me.venuatu.commute.views.{TripView, TripStopView, BaseFragment}
 import me.venuatu.commute.web.Commute
 import me.venuatu.commute.web.Commute.Trip
 import macroid.FullDsl._
@@ -34,7 +36,8 @@ object TripFragment {
 class TripFragment extends BaseFragment() {
 
   var trip: Trip = null
-  var recycler = slot[RecyclerView]
+  var scrollView = slot[ScrollView]
+  var layout = slot[RelativeLayout]
   var location: Tracker.Location = null
 
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, bundle: Bundle) = {
@@ -46,12 +49,83 @@ class TripFragment extends BaseFragment() {
     }
 
     val view = getUi(
-      w[RecyclerView]() <~ wire(recycler)
+      l[ScrollView](
+        l[RelativeLayout](
+//          w[TripView] <~ wire(tripView) <~ lp[RelativeLayout](48.dp, MATCH_PARENT)
+        ) <~ wire(layout)
+      ) <~ wire(scrollView)
     )
-    val lm = new LinearLayoutManager(ctx)
-    lm.setOrientation(1)
-    recycler.get.setLayoutManager(lm)
-    recycler.get.setAdapter(new ListAdapter)
+
+    val MIN_DISTANCE: Int = (48.dp * 1.6).toInt
+    val MAX_DISTANCE: Int = (48.dp * 9 / 3.0 * 2).toInt
+    val LENGTH_PER_SECOND = 48.dp * 11 / 3.0 * 2/ 60.0 / 60.0
+    val length: Double = trip.duration * LENGTH_PER_SECOND
+    var cumulativeLength: Double = 0
+    var previousDifference: Double = 0
+    var topOffset = -1
+    val TIME_FLAGS = DateUtils.FORMAT_SHOW_TIME
+
+    trip.legs.map{leg =>
+      var text = slot[TextView]
+      val view = getUi(
+        l[LinearLayout](
+          w[TextView] <~ wire(text)// <~ textStyle(style.TextAppearance_AppCompat_Small)
+            <~ padding(bottom = 8.dp)
+            <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT)
+        ) <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT) <~ horizontal
+      )
+
+//      val time = Calendar.getInstance()
+//      time.setTimeInMillis(leg.startTime)
+      text.get.setTextSize(8.sp)
+      text.get.setTextColor(0xff000000)
+      val route = leg.route.getOrElse("")
+
+      text.get.setText(Seq(
+        leg.transport + " " + route + " " +
+          DateUtils.formatDateTime(ctx, leg.startTime, TIME_FLAGS),// + " " + DateUtils.getRelativeTimeSpanString(leg.startTime),
+        leg.from.name,// + " " + offset,
+        leg.distance + "m " + (leg.duration / 60) + " minutes"
+      ).mkString("\n"))
+
+      val difference = Math.min(Math.max(previousDifference, MIN_DISTANCE), MAX_DISTANCE)
+
+      val params = new RelativeLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+      params.leftMargin = 72.dp
+      params.topMargin = (length - (cumulativeLength + difference)).toInt
+
+//      println(leg.from.name.take(10), leg.to.name.take(10), previousDifference / length, difference, params.topMargin, cumulativeLength, length, MIN_DISTANCE, MAX_DISTANCE)
+      cumulativeLength = cumulativeLength + difference
+      previousDifference = (leg.duration * LENGTH_PER_SECOND).toInt
+
+      (leg, view, params, previousDifference)
+    }.sortBy(_._3.topMargin).foreach{case (leg, textview, params, difference) =>
+
+      val diff = Math.min(Math.max(difference.toInt, MIN_DISTANCE), MAX_DISTANCE)
+      val offset = 54.dp
+
+      val icon = new TripStopView(ctx)
+      icon.setLeg(leg)
+      val iconParams = new RelativeLayout.LayoutParams(72.dp, diff.toInt + icon.offset.toInt)
+      iconParams.topMargin = params.topMargin - topOffset - diff.toInt + offset
+//      iconParams.leftMargin = 6.dp
+
+      if (topOffset == -1) {
+        topOffset = params.topMargin - diff.toInt + offset
+        iconParams.topMargin = 0
+      }
+
+      params.topMargin = params.topMargin - topOffset
+
+      layout.get.addView(textview, params)
+      layout.get.addView(icon, iconParams)
+    }
+
+    val back = new ColorDrawable(0xDDE9E9E9)
+    scrollView.get.setBackground(back)
+    scrollView.get.postDelayed(asRunnable{
+      scrollView.get.scrollTo(0, scrollView.get.getBottom)
+    }, 100)
 
     view
   }
@@ -61,56 +135,14 @@ class TripFragment extends BaseFragment() {
 //    trip = bundle.getSerializable("trip").asInstanceOf[Trip]
 //  }
 
+  override def onResume() = {
+    super.onResume()
+  }
+
   override def onSaveInstanceState(bundle: Bundle) {
     super.onSaveInstanceState(bundle)
     bundle.putSerializable("trip", trip)
   }
 
-  case class Holder(text: TextView, trip: TripStopView, view: View) extends ViewHolder(view)
 
-  class ListAdapter extends RecyclerView.Adapter[Holder] {
-    lazy val offset = {
-      Calendar.getInstance().getTimeZone.getOffset(0)
-    }
-
-    override def onCreateViewHolder(group: ViewGroup, viewType: Int): Holder = {
-      var text = slot[TextView]
-      var tripview = slot[TripStopView]
-      val view = getUi(
-        l[LinearLayout](
-          w[TripStopView] <~ wire(tripview) <~ lp[LinearLayout](64.dp, MATCH_PARENT),
-          w[TextView] <~ wire(text) <~ textStyle(style.TextAppearance_AppCompat_Body1)
-            <~ padding(bottom = 8.dp)
-            <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT)
-        ) <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT) <~ horizontal
-      )
-
-      //      text.get.setBackground(attrDrawable(R.attr.selectableItemBackground))
-      Holder(text.get, tripview.get, view)
-    }
-
-    override def onBindViewHolder(p1: Holder, p2: Int) {
-      if (p2 < trip.legs.length) {
-        val leg = trip.legs(p2)
-        p1.text.setText(Seq(
-          leg.transport + " " + leg.routeId.toJson.prettyPrint.replace("null", "") + " " +
-              (System.currentTimeMillis() - offset - leg.startTime),
-          leg.from.name + " " + offset,
-          leg.distance + "m " + leg.duration + "s"
-        ).mkString("\n"))
-        p1.trip.setLeg(leg)
-      } else {
-        val leg = trip.legs(p2 -1)
-        p1.text.setText(Seq(
-          leg.to.name,
-          (System.currentTimeMillis() - offset - leg.endTime) + "s"
-        ).mkString("\n"))
-        p1.trip.setLeg(null)
-      }
-    }
-
-    override def getItemCount: Int = {
-      trip.legs.length +1
-    }
-  }
 }

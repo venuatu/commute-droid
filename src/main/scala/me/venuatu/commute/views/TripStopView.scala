@@ -19,6 +19,10 @@ class TripStopView(ctx: Context) extends View(ctx) with Contexts[View] {
     metrics.density
   }
 
+  val offset = dp(5)
+
+  setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+
   def dp(i: Int) = i * density
 
   override def onDraw(canvas: Canvas) {
@@ -26,18 +30,20 @@ class TripStopView(ctx: Context) extends View(ctx) with Contexts[View] {
     val middle = getWidth / 2
 
     brush.setARGB(0, 0, 0, 0)
-    canvas.drawRect(0, 0, getWidth, getHeight, brush)
+    canvas.drawRect(0, 0, getWidth, getHeight - offset, brush)
     brush.setAntiAlias(true)
 
     brush.setColor(color)
-    canvas.drawCircle(middle, getWidth / 3, getWidth / 3, brush)
 
     if (leg != null) {
-//      brush.setColor(Color.BLACK)
-//      canvas.drawRect(middle - dp(3), 0, middle + dp(3), getHeight, brush)
-
-      canvas.drawRect(middle - dp(2), 0, middle + dp(2), getHeight, brush)
+      brush.clearShadowLayer()
+      canvas.drawRect(middle - dp(3), 0, middle + dp(3), getHeight - offset, brush)
     }
+
+//    brush.setColor(0xFFcccccc)
+    brush.setShadowLayer(dp(5), 0, 0, 0xFF333333)
+    canvas.drawCircle(middle, getHeight - getWidth / 3 - offset, getWidth / 3, brush)
+
   }
 
   def setLeg(Leg: TripLeg) {
@@ -48,9 +54,11 @@ class TripStopView(ctx: Context) extends View(ctx) with Contexts[View] {
       color = leg.transport match {
         case "BUS" => Color.YELLOW
         case "RAIL" => Color.BLUE
+        case "TRAM" => 0xFF800000
         case "FERRY" => Color.CYAN
         case "CAR" => Color.RED
-        case "WALK" => 0xffdddddd
+        case "WALK" => 0xffffffff
+        case _ => Color.WHITE
       }
     }
 

@@ -22,8 +22,9 @@ object Commute {
   case class TripRoadSegments(id: String, path: String, lastStep: Int, distance: Float, quickDuration: Float,
                               minDuration: Float, maxDuration: Float, congestion: Int)
   case class TripLeg(from: StopLocation, to: StopLocation, transport: String, startTime: Long, endTime: Long,
-                      duration: Float, distance: Float, path: String, realTime: Boolean, routeId: Option[String],
-                      steps: Seq[TripStep], alerts: Seq[TripLegAlert], roadSegments: Seq[TripRoadSegments])
+                      duration: Float, distance: Float, path: String, realTime: Boolean, route: Option[String],
+                      routeId: Option[String], steps: Seq[TripStep], alerts: Seq[TripLegAlert],
+                      roadSegments: Seq[TripRoadSegments])
   case class Trip(from: StopLocation, to: StopLocation, startTime: Long, endTime: Long, duration: Float,
                    distance: Float, transfers: Int, mainTransport: String, walkDistance: Option[Float],
                    walkTime: Option[Float], transitTime: Option[Float], waitingTime: Option[Float],
@@ -37,7 +38,7 @@ object Commute {
   implicit val TripRoadSegmentsFmt = jsonFormat(TripRoadSegments, "_id", "path", "lastStep", "distance",
                                                 "quickDuration", "minDuration", "maxDuration", "congestion")
   implicit val TripLegFmt = jsonFormat(TripLeg, "from", "to", "transport", "startTime", "endTime", "duration",
-                                        "distance", "path", "realTime", "routeId", "steps", "alerts", "roadSegments")
+                                        "distance", "path", "realTime", "route", "routeId", "steps", "alerts", "roadSegments")
   implicit val TripFmt = jsonFormat(Trip, "from", "to", "startTime", "endTime", "duration", "distance", "transfers",
                                     "mainTransport", "walkDistance", "walkTime", "transitTime", "waitingTime", "legs")
   implicit val TripResultFmt = jsonFormat(TripResult, "trips")
