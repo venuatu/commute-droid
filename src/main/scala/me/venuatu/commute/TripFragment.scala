@@ -66,6 +66,7 @@ class TripFragment extends BaseFragment() {
     val TIME_FLAGS = DateUtils.FORMAT_SHOW_TIME
 
     trip.legs.map{leg =>
+      // Create a sidebar view and a text view for each trip.leg
       var text = slot[TextView]
       val view = getUi(
         l[LinearLayout](
@@ -75,8 +76,6 @@ class TripFragment extends BaseFragment() {
         ) <~ lp[LinearLayout](MATCH_PARENT, WRAP_CONTENT) <~ horizontal
       )
 
-//      val time = Calendar.getInstance()
-//      time.setTimeInMillis(leg.startTime)
       text.get.setTextSize(8.sp)
       text.get.setTextColor(0xff000000)
       val route = leg.route.getOrElse("")
@@ -94,13 +93,13 @@ class TripFragment extends BaseFragment() {
       params.leftMargin = 72.dp
       params.topMargin = (length - (cumulativeLength + difference)).toInt
 
-//      println(leg.from.name.take(10), leg.to.name.take(10), previousDifference / length, difference, params.topMargin, cumulativeLength, length, MIN_DISTANCE, MAX_DISTANCE)
       cumulativeLength = cumulativeLength + difference
       previousDifference = (leg.duration * LENGTH_PER_SECOND).toInt
 
       (leg, view, params, previousDifference)
     }.sortBy(_._3.topMargin).foreach{case (leg, textview, params, difference) =>
 
+      // Compact the above layout positions for perfection and probably bad math
       val diff = Math.min(Math.max(difference.toInt, MIN_DISTANCE), MAX_DISTANCE)
       val offset = 54.dp
 
@@ -108,7 +107,6 @@ class TripFragment extends BaseFragment() {
       icon.setLeg(leg)
       val iconParams = new RelativeLayout.LayoutParams(72.dp, diff.toInt + icon.offset.toInt)
       iconParams.topMargin = params.topMargin - topOffset - diff.toInt + offset
-//      iconParams.leftMargin = 6.dp
 
       if (topOffset == -1) {
         topOffset = params.topMargin - diff.toInt + offset
@@ -129,11 +127,6 @@ class TripFragment extends BaseFragment() {
 
     view
   }
-
-//  override def onRestoreInstanceState(bundle: Bundle) {
-//    super.onRestoreInstanceState(bundle)
-//    trip = bundle.getSerializable("trip").asInstanceOf[Trip]
-//  }
 
   override def onResume() = {
     super.onResume()
