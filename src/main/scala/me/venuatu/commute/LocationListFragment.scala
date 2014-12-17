@@ -39,7 +39,10 @@ class LocationListFragment extends views.BaseFragment() {
     "Work" ->                           new LatLng(-34.408460, 150.882353),
     "Coles Fairy Meadow" ->             new LatLng(-34.394601, 150.893009),
     "Deloitte" ->                       new LatLng(-33.862794, 151.207398),
-    "Transport for New South Wales" ->  new LatLng(-33.884096, 151.203697)
+    "Transport for New South Wales" ->  new LatLng(-33.884096, 151.203697),
+    "Google Pyrmont" ->                 new LatLng(-33.867095, 151.195876),
+    "Palmer St, Artarmon" ->            new LatLng(-33.806742, 151.181688),
+    "Bossley Park Public School" ->     new LatLng(-33.858736, 150.882481)
   )
 
   var recycler = slot[RecyclerView]

@@ -26,7 +26,7 @@ scalacOptions in (Compile, compile) ++= Seq(
 
 libraryDependencies ++= Seq(
   aar("org.macroid" %% "macroid" % "2.0.+"),
-  aar("com.google.android.gms" % "play-services" % "6.+"),
+  aar("com.google.android.gms" % "play-services" % "6.1.+"),
   aar("com.android.support" % "support-v4" % "+"),
   aar("com.android.support" % "appcompat-v7" % "+"),
   "com.android.support" % "recyclerview-v7" % "+",
